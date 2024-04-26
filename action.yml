@@ -1,0 +1,124 @@
+name: ReleaseManager Production
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  after_daily_deploy:
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == ${{ secrets.PRODUCTION_BRANCH }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Production Branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ secrets.PRODUCTION_BRANCH }}
+        fetch-depth: 0
+        token: ${{ secrets.PAT }}
+
+    - name: Set Variables
+      id: set-variables
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        daily_deploy=false
+        if [[ "${{ github.event.pull_request.head.ref }}" == "dev" ]]; then
+          daily_deploy=true
+        fi
+
+        LATEST_TAG=$(gh release view --json tagName -q .tagName)
+
+        major=$(echo $LATEST_TAG | cut -d. -f1)
+        minor=$(echo $LATEST_TAG | cut -d. -f2)
+        patch=$(echo $LATEST_TAG | cut -d. -f3)
+
+        if $daily_deploy; then
+          ((minor=minor+1))
+          patch=0
+        else
+          ((patch=patch+1))
+        fi
+
+        RELEASE_TAG="$major.$minor.$patch"
+
+        ((minor=minor+1))
+
+        NEXT_RELEASE_TAG="$major.$minor.0"
+
+        echo "LATEST_TAG=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+        echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+        echo "NEXT_RELEASE_TAG=$NEXT_RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+    - name: Deploy to Heroku
+      uses: akhileshns/heroku-deploy@v3.13.15
+      with:
+        heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+        heroku_app_name: ${{ secrets.HEROKU_API_NAME }}
+        heroku_email: '${{ github.actor }}@users.noreply.github.com'
+
+    - name: Create Release Tag
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        LATEST_TAG: ${{ steps.set-variables.outputs.LATEST_TAG }}
+        RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
+      run: |
+        COMMITS=$(git log --pretty=format:'- %s' ${{ github.event.pull_request.base.sha }}..${{ github.sha }} --no-merges --reverse)
+        BODY=$(printf "%s\n\nFull Changelog: %s" "$COMMITS" "[$LATEST_TAG...$RELEASE_TAG](https://github.com/LeCollectionist/${{ env.GITHUB_REPOSITORY }}/compare/$LATEST_TAG...$RELEASE_TAG)")
+        gh release create $RELEASE_TAG --target ${{ secrets.PRODUCTION_BRANCH }} --notes "$BODY" --title $RELEASE_TAG
+
+    - name: Send message to Slack
+      env:
+        SLACK_API_TOKEN: ${{ secrets.SLACK_API_TOKEN }}
+        SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+        RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
+        DISPLAY_NAME: ${{ secrets.DISPLAY_NAME }}
+      run: |
+        COMMITS=$(git log --pretty=format:'- %s' ${{ github.event.pull_request.base.sha }}..${{ github.sha }} --no-merges --reverse)
+        PAYLOAD='{"text":"<!here> Deploy `$DISPLAY_NAME` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
+        curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_API_TOKEN" --data "$PAYLOAD" "https://slack.com/api/chat.postMessage"
+
+    - name: Checkout Dev
+      uses: actions/checkout@v4
+      with:
+        ref: dev
+        fetch-depth: 0
+        token: ${{ secrets.PAT }}
+
+    - name: Rebase Production Branch into Dev
+      if: github.event.pull_request.head.ref != 'dev'
+      run: |
+        git config user.name "${{ github.actor }}"
+        git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+        git rebase origin/${{ secrets.PRODUCTION_BRANCH }}
+
+        if [ $? -eq 0 ] && [ -z "$(git diff origin/dev)" ]; then
+          git push -f origin dev
+        fi
+
+    - name: Update Version Configuration on Dev
+      if: github.event.pull_request.head.ref == 'dev'
+      env:
+        NEXT_RELEASE_TAG: ${{ steps.set-variables.outputs.NEXT_RELEASE_TAG }}
+      run: |
+        sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
+
+        git config user.name "${{ github.actor }}"
+        git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+        git add ./config/initializers/bugsnag.rb
+        git commit -m "chore(app-version): Bump app version to $NEXT_RELEASE_TAG"
+        git push origin dev
+
+    - name: Create Daily Pull Request
+      if: github.event.pull_request.head.ref == 'dev'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh pr create --base ${{ secrets.PRODUCTION_BRANCH }} --head dev --title "${{ secrets.PRODUCTION_BRANCH }} < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
