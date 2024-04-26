@@ -42,7 +42,7 @@ permissions:
 
 jobs:
   after_daily_deploy:
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == ${{ inputs.production_branch }}
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == github.event.inputs.production_branch
     runs-on: ubuntu-latest
 
     steps:
