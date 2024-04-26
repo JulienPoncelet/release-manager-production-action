@@ -5,6 +5,32 @@ branding:
   icon: 'git-merge'
   color: 'gray-dark'
 
+inputs:
+  production_branch:
+    description: 'The name of the production branch'
+    required: true
+  github_token:
+    description: 'GitHub token for accessing repository'
+    required: true
+  heroku_api_key:
+    description: 'API key for accessing Heroku'
+    required: true
+  heroku_app_name:
+    description: 'Name of the Heroku app'
+    required: true
+  slack_api_token:
+    description: 'API token for accessing Slack'
+    required: true
+  slack_channel_id:
+    description: 'ID of the Slack channel'
+    required: true
+  display_name:
+    description: 'Display name for Slack messages'
+    required: true
+  pat:
+    description: 'Personal access token for GitHub'
+    required: true
+
 on:
   pull_request:
     types:
@@ -16,21 +42,21 @@ permissions:
 
 jobs:
   after_daily_deploy:
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == ${{ secrets.PRODUCTION_BRANCH }}
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == ${{ inputs.production_branch }}
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Production Branch
       uses: actions/checkout@v4
       with:
-        ref: ${{ secrets.PRODUCTION_BRANCH }}
+        ref: ${{ inputs.production_branch }}
         fetch-depth: 0
-        token: ${{ secrets.PAT }}
+        token: ${{ inputs.pat }}
 
     - name: Set Variables
       id: set-variables
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ inputs.github_token }}
       run: |
         daily_deploy=false
         if [[ "${{ github.event.pull_request.head.ref }}" == "dev" ]]; then
@@ -63,26 +89,26 @@ jobs:
     - name: Deploy to Heroku
       uses: akhileshns/heroku-deploy@v3.13.15
       with:
-        heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-        heroku_app_name: ${{ secrets.HEROKU_API_NAME }}
+        heroku_api_key: ${{ inputs.heroku_api_key }}
+        heroku_app_name: ${{ inputs.heroku_app_name }}
         heroku_email: '${{ github.actor }}@users.noreply.github.com'
 
     - name: Create Release Tag
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ inputs.github_token }}
         LATEST_TAG: ${{ steps.set-variables.outputs.LATEST_TAG }}
         RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
       run: |
         COMMITS=$(git log --pretty=format:'- %s' ${{ github.event.pull_request.base.sha }}..${{ github.sha }} --no-merges --reverse)
         BODY=$(printf "%s\n\nFull Changelog: %s" "$COMMITS" "[$LATEST_TAG...$RELEASE_TAG](https://github.com/LeCollectionist/${{ env.GITHUB_REPOSITORY }}/compare/$LATEST_TAG...$RELEASE_TAG)")
-        gh release create $RELEASE_TAG --target ${{ secrets.PRODUCTION_BRANCH }} --notes "$BODY" --title $RELEASE_TAG
+        gh release create $RELEASE_TAG --target ${{ inputs.production_branch }} --notes "$BODY" --title $RELEASE_TAG
 
     - name: Send message to Slack
       env:
-        SLACK_API_TOKEN: ${{ secrets.SLACK_API_TOKEN }}
-        SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+        SLACK_API_TOKEN: ${{ inputs.slack_api_token }}
+        SLACK_CHANNEL_ID: ${{ inputs.slack_channel_id }}
         RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
-        DISPLAY_NAME: ${{ secrets.DISPLAY_NAME }}
+        DISPLAY_NAME: ${{ inputs.display_name }}
       run: |
         COMMITS=$(git log --pretty=format:'- %s' ${{ github.event.pull_request.base.sha }}..${{ github.sha }} --no-merges --reverse)
         PAYLOAD='{"text":"<!here> Deploy `$DISPLAY_NAME` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
@@ -93,7 +119,7 @@ jobs:
       with:
         ref: dev
         fetch-depth: 0
-        token: ${{ secrets.PAT }}
+        token: ${{ inputs.pat }}
 
     - name: Rebase Production Branch into Dev
       if: github.event.pull_request.head.ref != 'dev'
@@ -101,7 +127,7 @@ jobs:
         git config user.name "${{ github.actor }}"
         git config user.email "${{ github.actor }}@users.noreply.github.com"
 
-        git rebase origin/${{ secrets.PRODUCTION_BRANCH }}
+        git rebase origin/${{ inputs.production_branch }}
 
         if [ $? -eq 0 ] && [ -z "$(git diff origin/dev)" ]; then
           git push -f origin dev
@@ -124,6 +150,6 @@ jobs:
     - name: Create Daily Pull Request
       if: github.event.pull_request.head.ref == 'dev'
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ inputs.github_token }}
       run: |
-        gh pr create --base ${{ secrets.PRODUCTION_BRANCH }} --head dev --title "${{ secrets.PRODUCTION_BRANCH }} < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
+        gh pr create --base ${{ inputs.production_branch }} --head dev --title "${{ inputs.production_branch }} < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
