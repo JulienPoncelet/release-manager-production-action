@@ -30,6 +30,18 @@ inputs:
   pat:
     description: 'Personal access token for GitHub'
     required: true
+  pull_request_head_ref:
+    description: 'Pull Request head ref'
+    required: true
+  actor:
+    description: 'Github actor'
+    required: true
+  pull_request_base_sha:
+    description: 'Pull Request base sha'
+    required: true
+  pull_request_current_sha:
+    description: 'Pull Request current sha'
+    required: true
 
 on:
   pull_request:
@@ -59,7 +71,7 @@ jobs:
         GH_TOKEN: github.event.inputs.github_token
       run: |
         daily_deploy=false
-        if [[ "${{ github.event.pull_request.head.ref }}" == "dev" ]]; then
+        if [[ "${{ inputs.pull_request_head_ref }}" == "dev" ]]; then
           daily_deploy=true
         fi
 
@@ -91,7 +103,7 @@ jobs:
       with:
         heroku_api_key: github.event.inputs.heroku_api_key
         heroku_app_name: github.event.inputs.heroku_app_name
-        heroku_email: '${{ github.actor }}@users.noreply.github.com'
+        heroku_email: '${{ inputs.actor }}@users.noreply.github.com'
 
     - name: Create Release Tag
       env:
@@ -99,7 +111,7 @@ jobs:
         LATEST_TAG: ${{ steps.set-variables.outputs.LATEST_TAG }}
         RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
       run: |
-        COMMITS=$(git log --pretty=format:'- %s' ${{ github.event.pull_request.base.sha }}..${{ github.sha }} --no-merges --reverse)
+        COMMITS=$(git log --pretty=format:'- %s' ${{ inputs.pull_request_base_sha}}..${{ inputs.current_sha }} --no-merges --reverse)
         BODY=$(printf "%s\n\nFull Changelog: %s" "$COMMITS" "[$LATEST_TAG...$RELEASE_TAG](https://github.com/LeCollectionist/${{ env.GITHUB_REPOSITORY }}/compare/$LATEST_TAG...$RELEASE_TAG)")
         gh release create $RELEASE_TAG --target ${{ inputs.production_branch }} --notes "$BODY" --title $RELEASE_TAG
 
@@ -110,7 +122,7 @@ jobs:
         RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
         DISPLAY_NAME: github.event.inputs.display_name
       run: |
-        COMMITS=$(git log --pretty=format:'- %s' ${{ github.event.pull_request.base.sha }}..${{ github.sha }} --no-merges --reverse)
+        COMMITS=$(git log --pretty=format:'- %s' ${{ inputs.pull_request_base_sha}}..${{ inputs.current_sha }} --no-merges --reverse)
         PAYLOAD='{"text":"<!here> Deploy `$DISPLAY_NAME` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
         curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_API_TOKEN" --data "$PAYLOAD" "https://slack.com/api/chat.postMessage"
 
