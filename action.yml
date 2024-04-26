@@ -49,14 +49,14 @@ jobs:
     - name: Checkout Production Branch
       uses: actions/checkout@v4
       with:
-        ref: ${{ inputs.production_branch }}
+        ref: github.event.inputs.production_branch
         fetch-depth: 0
-        token: ${{ inputs.pat }}
+        token: github.event.inputs.pat
 
     - name: Set Variables
       id: set-variables
       env:
-        GH_TOKEN: ${{ inputs.github_token }}
+        GH_TOKEN: github.event.inputs.github_token
       run: |
         daily_deploy=false
         if [[ "${{ github.event.pull_request.head.ref }}" == "dev" ]]; then
@@ -89,13 +89,13 @@ jobs:
     - name: Deploy to Heroku
       uses: akhileshns/heroku-deploy@v3.13.15
       with:
-        heroku_api_key: ${{ inputs.heroku_api_key }}
-        heroku_app_name: ${{ inputs.heroku_app_name }}
+        heroku_api_key: github.event.inputs.heroku_api_key
+        heroku_app_name: github.event.inputs.heroku_app_name
         heroku_email: '${{ github.actor }}@users.noreply.github.com'
 
     - name: Create Release Tag
       env:
-        GH_TOKEN: ${{ inputs.github_token }}
+        GH_TOKEN: github.event.inputs.github_token
         LATEST_TAG: ${{ steps.set-variables.outputs.LATEST_TAG }}
         RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
       run: |
@@ -105,10 +105,10 @@ jobs:
 
     - name: Send message to Slack
       env:
-        SLACK_API_TOKEN: ${{ inputs.slack_api_token }}
-        SLACK_CHANNEL_ID: ${{ inputs.slack_channel_id }}
+        SLACK_API_TOKEN: github.event.inputs.slack_api_token
+        SLACK_CHANNEL_ID: github.event.inputs.slack_channel_id
         RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
-        DISPLAY_NAME: ${{ inputs.display_name }}
+        DISPLAY_NAME: github.event.inputs.display_name
       run: |
         COMMITS=$(git log --pretty=format:'- %s' ${{ github.event.pull_request.base.sha }}..${{ github.sha }} --no-merges --reverse)
         PAYLOAD='{"text":"<!here> Deploy `$DISPLAY_NAME` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
@@ -119,7 +119,7 @@ jobs:
       with:
         ref: dev
         fetch-depth: 0
-        token: ${{ inputs.pat }}
+        token: github.event.inputs.pat
 
     - name: Rebase Production Branch into Dev
       if: github.event.pull_request.head.ref != 'dev'
@@ -150,6 +150,6 @@ jobs:
     - name: Create Daily Pull Request
       if: github.event.pull_request.head.ref == 'dev'
       env:
-        GH_TOKEN: ${{ inputs.github_token }}
+        GH_TOKEN: github.event.inputs.github_token
       run: |
         gh pr create --base ${{ inputs.production_branch }} --head dev --title "${{ inputs.production_branch }} < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
