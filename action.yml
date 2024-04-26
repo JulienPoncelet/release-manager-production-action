@@ -1,5 +1,7 @@
 name: ReleaseManager Production
 
+description: Automate production releases with versioning. Streamline deployments for efficient and controlled updates.
+
 on:
   pull_request:
     types:
