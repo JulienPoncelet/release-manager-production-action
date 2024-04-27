@@ -6,17 +6,11 @@ branding:
   color: 'gray-dark'
 
 inputs:
-  production_branch:
-    description: 'The name of the production branch'
-    required: true
   github_token:
     description: 'GitHub token for accessing repository'
     required: true
   heroku_api_key:
     description: 'API key for accessing Heroku'
-    required: true
-  heroku_app_name:
-    description: 'Name of the Heroku app'
     required: true
   slack_api_token:
     description: 'API token for accessing Slack'
@@ -24,29 +18,35 @@ inputs:
   slack_channel_id:
     description: 'ID of the Slack channel'
     required: true
-  display_name:
-    description: 'Display name for Slack messages'
-    required: true
   pat:
     description: 'Personal access token for GitHub'
-    required: true
-  pull_request_head_ref:
-    description: 'Pull Request head ref'
-    required: true
-  actor:
-    description: 'Github actor'
     required: true
   pull_request_base_sha:
     description: 'Pull Request base sha'
     required: true
-  pull_request_current_sha:
-    description: 'Pull Request current sha'
+  pull_request_head_ref:
+    description: 'Pull Request head ref'
+    required: true
+  pull_request_head_sha:
+    description: 'Pull Request head sha'
+    required: true
+  actor:
+    description: 'Github actor'
+    required: true
+  display_name:
+    description: 'Display name for Slack messages'
     required: true
   github_organizations:
     description: 'GitHub organization name'
     required: true
   github_repository:
     description: 'GitHub repository name'
+    required: true
+  heroku_app_name:
+    description: 'Name of the Heroku app'
+    required: true
+  production_branch:
+    description: 'The name of the production branch'
     required: true
 
 outputs:
@@ -117,12 +117,12 @@ runs:
     shell: bash
     env:
       PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
-      PULL_REQUEST_CURRENT_SHA: ${{ inputs.current_sha }}
+      PULL_REQUEST_HEAD_SHA: ${{ inputs.pull_request_head_sha }}
       GH_TOKEN: ${{ inputs.github_token }}
       GITHUB_REPOSITORY: ${{ inputs.github_repository }}
       PRODUCTION_BRANCH: ${{ inputs.production_branch }}
     run: |
-      COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_CURRENT_SHA --no-merges --reverse)
+      COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_HEAD_SHA --no-merges --reverse)
       BODY=$(printf "%s\n\nFull Changelog: %s" "$COMMITS" "[$LATEST_TAG...$RELEASE_TAG](https://github.com/LeCollectionist/$GITHUB_REPOSITORY/compare/$LATEST_TAG...$RELEASE_TAG)")
       gh release create $RELEASE_TAG --target $PRODUCTION_BRANCH --notes "$BODY" --title $RELEASE_TAG
 
@@ -130,12 +130,12 @@ runs:
     shell: bash
     env:
       PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
-      PULL_REQUEST_CURRENT_SHA: ${{ inputs.current_sha }}
+      PULL_REQUEST_HEAD_SHA: ${{ inputs.pull_request_head_sha }}
       DISPLAY_NAME: ${{ inputs.display_name }}
       SLACK_CHANNEL_ID: ${{ inputs.slack_channel_id }}
       SLACK_API_TOKEN: ${{ inputs.slack_api_token }}
     run: |
-      COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_CURRENT_SHA --no-merges --reverse)
+      COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_HEAD_SHA --no-merges --reverse)
       PAYLOAD='{"text":"<!here> Deploy `$DISPLAY_NAME` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
       curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_API_TOKEN" --data "$PAYLOAD" "https://slack.com/api/chat.postMessage"
 
