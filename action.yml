@@ -42,6 +42,9 @@ inputs:
   pull_request_current_sha:
     description: 'Pull Request current sha'
     required: true
+  github_organizations:
+    description: 'GitHub organization name'
+    required: true
   github_repository:
     description: 'GitHub repository name'
     required: true
@@ -63,6 +66,7 @@ runs:
   - name: Checkout Production Branch
     uses: actions/checkout@v4
     with:
+      repository: github.event.inputs.github_organizations/github.event.inputs.github_repository
       ref: github.event.inputs.production_branch
       fetch-depth: 0
       token: github.event.inputs.pat
@@ -138,6 +142,7 @@ runs:
   - name: Checkout Dev
     uses: actions/checkout@v4
     with:
+      repository: github.event.inputs.github_organizations/github.event.inputs.github_repository
       ref: dev
       fetch-depth: 0
       token: github.event.inputs.pat
