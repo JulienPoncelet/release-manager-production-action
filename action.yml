@@ -46,6 +46,17 @@ inputs:
     description: 'GitHub repository name'
     required: true
 
+outputs:
+  latest-tag:
+    description: "Latest Tag"
+    value: ${{ steps.set-variables.outputs.latest-tag }}
+  release-tag:
+    description: "Release Tag"
+    value: ${{ steps.set-variables.outputs.release-tag }}
+  next-release-tag:
+    description: "Next Release Tag"
+    value: ${{ steps.set-variables.outputs.next-release-tag }}
+
 on:
   pull_request:
     types:
@@ -114,8 +125,6 @@ jobs:
         PULL_REQUEST_BASE_SHA: github.event.inputs.pull_request_base_sha
         PULL_REQUEST_CURRENT_SHA: github.event.inputs.current_sha
         GH_TOKEN: github.event.inputs.github_token
-        LATEST_TAG: ${{ steps.set-variables.outputs.latest-tag }}
-        RELEASE_TAG: ${{ steps.set-variables.outputs.release-tag }}
         GITHUB_REPOSITORY: github.event.inputs.github_repository
         PRODUCTION_BRANCH: github.event.inputs.production_branch
       run: |
@@ -128,7 +137,6 @@ jobs:
         PULL_REQUEST_BASE_SHA: github.event.inputs.pull_request_base_sha
         PULL_REQUEST_CURRENT_SHA: github.event.inputs.current_sha
         DISPLAY_NAME: github.event.inputs.display_name
-        RELEASE_TAG: ${{ steps.set-variables.outputs.release-tag }}
         SLACK_CHANNEL_ID: github.event.inputs.slack_channel_id
         SLACK_API_TOKEN: github.event.inputs.slack_api_token
       run: |
@@ -161,7 +169,6 @@ jobs:
     - name: Update Version Configuration on Dev
       if: github.event.inputs.pull_request_head_ref == 'dev'
       env:
-        NEXT_RELEASE_TAG: ${{ steps.set-variables.outputs.next-release-tag }}
         ACTOR: github.event.inputs.actor
       run: |
         sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
@@ -177,5 +184,6 @@ jobs:
       if: github.event.inputs.pull_request_head_ref == 'dev'
       env:
         GH_TOKEN: github.event.inputs.github_token
+        PRODUCTION_BRANCH: github.event.inputs.production_branch
       run: |
-        gh pr create --base ${{ github.event.inputs.production_branch }} --head dev --title "${{ github.event.inputs.production_branch }} < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
+        gh pr create --base $PRODUCTION_BRANCH --head dev --title "$PRODUCTION_BRANCH < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
