@@ -75,8 +75,8 @@ runs:
     id: set-variables
     shell: bash
     env:
-      GH_TOKEN: github.event.inputs.github_token
-      PULL_REQUEST_HEAD_REF: github.event.inputs.pull_request_head_ref
+      GH_TOKEN: ${{ inputs.github_token }}
+      PULL_REQUEST_HEAD_REF: ${{ inputs.pull_request_head_ref }}
     run: |
       daily_deploy=false
       if [[ $PULL_REQUEST_HEAD_REF == "dev" ]]; then
@@ -109,18 +109,18 @@ runs:
   - name: Deploy to Heroku
     uses: akhileshns/heroku-deploy@v3.13.15
     with:
-      heroku_api_key: github.event.inputs.heroku_api_key
-      heroku_app_name: github.event.inputs.heroku_app_name
-      heroku_email: github.event.inputs.actor@users.noreply.github.com
+      heroku_api_key: ${{ inputs.heroku_api_key }}
+      heroku_app_name: ${{ inputs.heroku_app_name }}
+      heroku_email: ${{ inputs.actor@users.noreply.github.com }}
 
   - name: Create Release Tag
     shell: bash
     env:
-      PULL_REQUEST_BASE_SHA: github.event.inputs.pull_request_base_sha
-      PULL_REQUEST_CURRENT_SHA: github.event.inputs.current_sha
-      GH_TOKEN: github.event.inputs.github_token
-      GITHUB_REPOSITORY: github.event.inputs.github_repository
-      PRODUCTION_BRANCH: github.event.inputs.production_branch
+      PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
+      PULL_REQUEST_CURRENT_SHA: ${{ inputs.current_sha }}
+      GH_TOKEN: ${{ inputs.github_token }}
+      GITHUB_REPOSITORY: ${{ inputs.github_repository }}
+      PRODUCTION_BRANCH: ${{ inputs.production_branch }}
     run: |
       COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_CURRENT_SHA --no-merges --reverse)
       BODY=$(printf "%s\n\nFull Changelog: %s" "$COMMITS" "[$LATEST_TAG...$RELEASE_TAG](https://github.com/LeCollectionist/$GITHUB_REPOSITORY/compare/$LATEST_TAG...$RELEASE_TAG)")
@@ -129,11 +129,11 @@ runs:
   - name: Send message to Slack
     shell: bash
     env:
-      PULL_REQUEST_BASE_SHA: github.event.inputs.pull_request_base_sha
-      PULL_REQUEST_CURRENT_SHA: github.event.inputs.current_sha
-      DISPLAY_NAME: github.event.inputs.display_name
-      SLACK_CHANNEL_ID: github.event.inputs.slack_channel_id
-      SLACK_API_TOKEN: github.event.inputs.slack_api_token
+      PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
+      PULL_REQUEST_CURRENT_SHA: ${{ inputs.current_sha }}
+      DISPLAY_NAME: ${{ inputs.display_name }}
+      SLACK_CHANNEL_ID: ${{ inputs.slack_channel_id }}
+      SLACK_API_TOKEN: ${{ inputs.slack_api_token }}
     run: |
       COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_CURRENT_SHA --no-merges --reverse)
       PAYLOAD='{"text":"<!here> Deploy `$DISPLAY_NAME` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
@@ -142,17 +142,17 @@ runs:
   - name: Checkout Dev
     uses: actions/checkout@v4
     with:
-      repository: github.event.inputs.github_organizations/github.event.inputs.github_repository
+      repository: ${{ inputs.github_organizations }}/${{ inputs.github_repository }}
       ref: dev
       fetch-depth: 0
-      token: github.event.inputs.pat
+      token: ${{ inputs.pat }}
 
   - name: Rebase Production Branch into Dev
-    if: github.event.inputs.pull_request_head_ref != 'dev'
+    if: ${{ inputs.pull_request_head_ref != 'dev'
     shell: bash
     env:
-      ACTOR: github.event.inputs.actor
-      PRODUCTION_BRANCH: github.event.inputs.production_branch
+      ACTOR: ${{ inputs.actor }}
+      PRODUCTION_BRANCH: ${{ inputs.production_branch }}
     run: |
       git config user.name "$ACTOR"
       git config user.email "$ACTOR@users.noreply.github.com"
@@ -164,10 +164,10 @@ runs:
       fi
 
   - name: Update Version Configuration on Dev
-    if: github.event.inputs.pull_request_head_ref == 'dev'
+    if: ${{ inputs.pull_request_head_ref == 'dev' }}
     shell: bash
     env:
-      ACTOR: github.event.inputs.actor
+      ACTOR: ${{ inputs.actor }}
     run: |
       sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
 
@@ -179,10 +179,10 @@ runs:
       git push origin dev
 
   - name: Create Daily Pull Request
-    if: github.event.inputs.pull_request_head_ref == 'dev'
+    if: ${{ inputs.pull_request_head_ref == 'dev' }}
     shell: bash
     env:
-      GH_TOKEN: github.event.inputs.github_token
-      PRODUCTION_BRANCH: github.event.inputs.production_branch
+      GH_TOKEN: ${{ inputs.github_token }}
+      PRODUCTION_BRANCH: ${{ inputs.production_branch }}
     run: |
       gh pr create --base $PRODUCTION_BRANCH --head dev --title "$PRODUCTION_BRANCH < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
