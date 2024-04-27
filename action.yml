@@ -36,11 +36,8 @@ inputs:
   display_name:
     description: 'Display name for Slack messages'
     required: true
-  github_organizations:
-    description: 'GitHub organization name'
-    required: true
-  github_repository:
-    description: 'GitHub repository name'
+  github_repo_full_name:
+    description: 'GitHub repository full name'
     required: true
   heroku_app_name:
     description: 'Name of the Heroku app'
@@ -55,7 +52,7 @@ runs:
   - name: Checkout Production Branch
     uses: actions/checkout@v4
     with:
-      repository: ${{ inputs.github_organizations }}/${{ inputs.github_repository }}
+      repository: ${{ inputs.github_repo_full_name }}
       ref: ${{ inputs.production_branch }}
       fetch-depth: 0
       token: ${{ inputs.pat }}
@@ -110,11 +107,11 @@ runs:
       LATEST_TAG: ${{ env.latest-tag }}
       RELEASE_TAG: ${{ env.release-tag }}
       GH_TOKEN: ${{ inputs.github_token }}
-      GITHUB_REPOSITORY: ${{ inputs.github_repository }}
+      GITHUB_REPOSITORY: ${{ inputs.github_repo_full_name }}
       PRODUCTION_BRANCH: ${{ inputs.production_branch }}
     run: |
       COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_HEAD_SHA --no-merges --reverse)
-      BODY=$(printf "%s\n\nFull Changelog: %s" "$COMMITS" "[$LATEST_TAG...$RELEASE_TAG](https://github.com/LeCollectionist/$GITHUB_REPOSITORY/compare/$LATEST_TAG...$RELEASE_TAG)")
+      BODY=$(printf "%s\n\nFull Changelog: %s" "$COMMITS" "[$LATEST_TAG...$RELEASE_TAG](https://github.com/$GITHUB_REPOSITORY/compare/$LATEST_TAG...$RELEASE_TAG)")
       gh release create $RELEASE_TAG --target $PRODUCTION_BRANCH --notes "$BODY" --title $RELEASE_TAG
 
   - name: Send message to Slack
@@ -134,7 +131,7 @@ runs:
   - name: Checkout Dev
     uses: actions/checkout@v4
     with:
-      repository: ${{ inputs.github_organizations }}/${{ inputs.github_repository }}
+      repository: ${{ inputs.github_repo_full_name }}
       ref: dev
       fetch-depth: 0
       token: ${{ inputs.pat }}
