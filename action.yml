@@ -128,6 +128,14 @@ runs:
         PAYLOAD='{"text":"<!here> Deploy `'$DISPLAY_NAME'` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
         curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_API_TOKEN" --data "$PAYLOAD" "https://slack.com/api/chat.postMessage"
 
+    - name: Checkout Dev
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.github_repo_full_name }}
+        ref: dev
+        fetch-depth: 0
+        token: ${{ inputs.pat }}
+
     - name: Rebase Production Branch into Dev OR Update Version Configuration and Create Daily Pull Request
       shell: bash
       env:
