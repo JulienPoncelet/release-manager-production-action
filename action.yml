@@ -69,6 +69,7 @@ runs:
 
   - name: Set Variables
     id: set-variables
+    shell: bash
     env:
       GH_TOKEN: github.event.inputs.github_token
       PULL_REQUEST_HEAD_REF: github.event.inputs.pull_request_head_ref
@@ -109,6 +110,7 @@ runs:
       heroku_email: github.event.inputs.actor@users.noreply.github.com
 
   - name: Create Release Tag
+    shell: bash
     env:
       PULL_REQUEST_BASE_SHA: github.event.inputs.pull_request_base_sha
       PULL_REQUEST_CURRENT_SHA: github.event.inputs.current_sha
@@ -121,6 +123,7 @@ runs:
       gh release create $RELEASE_TAG --target $PRODUCTION_BRANCH --notes "$BODY" --title $RELEASE_TAG
 
   - name: Send message to Slack
+    shell: bash
     env:
       PULL_REQUEST_BASE_SHA: github.event.inputs.pull_request_base_sha
       PULL_REQUEST_CURRENT_SHA: github.event.inputs.current_sha
@@ -141,6 +144,7 @@ runs:
 
   - name: Rebase Production Branch into Dev
     if: github.event.inputs.pull_request_head_ref != 'dev'
+    shell: bash
     env:
       ACTOR: github.event.inputs.actor
       PRODUCTION_BRANCH: github.event.inputs.production_branch
@@ -156,6 +160,7 @@ runs:
 
   - name: Update Version Configuration on Dev
     if: github.event.inputs.pull_request_head_ref == 'dev'
+    shell: bash
     env:
       ACTOR: github.event.inputs.actor
     run: |
@@ -170,6 +175,7 @@ runs:
 
   - name: Create Daily Pull Request
     if: github.event.inputs.pull_request_head_ref == 'dev'
+    shell: bash
     env:
       GH_TOKEN: github.event.inputs.github_token
       PRODUCTION_BRANCH: github.event.inputs.production_branch
