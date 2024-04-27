@@ -125,7 +125,7 @@ runs:
       SLACK_API_TOKEN: ${{ inputs.slack_api_token }}
     run: |
       COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_HEAD_SHA --no-merges --reverse)
-      PAYLOAD='{"text":"<!here> Deploy $DISPLAY_NAME - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
+      PAYLOAD='{"text":"<!here> Deploy `'$DISPLAY_NAME'` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
       curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_API_TOKEN" --data "$PAYLOAD" "https://slack.com/api/chat.postMessage"
 
   - name: Checkout Dev
