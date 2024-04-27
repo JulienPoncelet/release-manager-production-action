@@ -95,12 +95,12 @@ runs:
       echo "release-tag=$(echo $RELEASE_TAG)" >> $GITHUB_ENV
       echo "next-release-tag=$(echo $NEXT_RELEASE_TAG)" >> $GITHUB_ENV
 
-  # - name: Deploy to Heroku
-  #   uses: akhileshns/heroku-deploy@v3.13.15
-  #   with:
-  #     heroku_api_key: ${{ inputs.heroku_api_key }}
-  #     heroku_app_name: ${{ inputs.heroku_app_name }}
-  #     heroku_email: ${{ inputs.actor }}@users.noreply.github.com
+  - name: Deploy to Heroku
+    uses: akhileshns/heroku-deploy@v3.13.15
+    with:
+      heroku_api_key: ${{ inputs.heroku_api_key }}
+      heroku_app_name: ${{ inputs.heroku_app_name }}
+      heroku_email: ${{ inputs.actor }}@users.noreply.github.com
 
   - name: Create Release Tag
     shell: bash
