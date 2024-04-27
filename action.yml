@@ -49,17 +49,6 @@ inputs:
     description: 'The name of the production branch'
     required: true
 
-outputs:
-  latest-tag:
-    description: "Latest Tag"
-    value: ${{ steps.set-variables.outputs.latest-tag }}
-  release-tag:
-    description: "Release Tag"
-    value: ${{ steps.set-variables.outputs.release-tag }}
-  next-release-tag:
-    description: "Next Release Tag"
-    value: ${{ steps.set-variables.outputs.next-release-tag }}
-
 runs:
   using: "composite"
   steps:
@@ -102,9 +91,9 @@ runs:
 
       NEXT_RELEASE_TAG="$major.$minor.0"
 
-      echo "latest-tag=$(echo $LATEST_TAG)" >> $GITHUB_OUTPUT
-      echo "release-tag=$(echo $RELEASE_TAG)" >> $GITHUB_OUTPUT
-      echo "next-release-tag=$(echo $NEXT_RELEASE_TAG)" >> $GITHUB_OUTPUT
+      echo "latest-tag=$(echo $LATEST_TAG)" >> $GITHUB_ENV
+      echo "release-tag=$(echo $RELEASE_TAG)" >> $GITHUB_ENV
+      echo "next-release-tag=$(echo $NEXT_RELEASE_TAG)" >> $GITHUB_ENV
 
   # - name: Deploy to Heroku
   #   uses: akhileshns/heroku-deploy@v3.13.15
@@ -118,8 +107,8 @@ runs:
     env:
       PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
       PULL_REQUEST_HEAD_SHA: ${{ inputs.pull_request_head_sha }}
-      LATEST_TAG: ${{ outputs.set-variables.latest-tag }}
-      RELEASE_TAG: ${{ outputs.set-variables.release-tag }}
+      LATEST_TAG: ${{ env.latest-tag }}
+      RELEASE_TAG: ${{ env.release-tag }}
       GH_TOKEN: ${{ inputs.github_token }}
       GITHUB_REPOSITORY: ${{ inputs.github_repository }}
       PRODUCTION_BRANCH: ${{ inputs.production_branch }}
@@ -134,6 +123,7 @@ runs:
       PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
       PULL_REQUEST_HEAD_SHA: ${{ inputs.pull_request_head_sha }}
       DISPLAY_NAME: ${{ inputs.display_name }}
+      RELEASE_TAG: ${{ env.release-tag }}
       SLACK_CHANNEL_ID: ${{ inputs.slack_channel_id }}
       SLACK_API_TOKEN: ${{ inputs.slack_api_token }}
     run: |
@@ -169,6 +159,7 @@ runs:
     if: ${{ inputs.pull_request_head_ref }} == 'dev'
     shell: bash
     env:
+      NEXT_RELEASE_TAG: ${{ env.next-release-tag }}
       ACTOR: ${{ inputs.actor }}
     run: |
       sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
