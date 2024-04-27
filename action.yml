@@ -69,9 +69,10 @@ jobs:
       id: set-variables
       env:
         GH_TOKEN: github.event.inputs.github_token
+        PULL_REQUEST_HEAD_REF: github.event.inputs.pull_request_head_ref
       run: |
         daily_deploy=false
-        if [[ "${{ github.event.inputs.pull_request_head_ref }}" == "dev" ]]; then
+        if [[ $PULL_REQUEST_HEAD_REF == "dev" ]]; then
           daily_deploy=true
         fi
 
@@ -103,26 +104,30 @@ jobs:
       with:
         heroku_api_key: github.event.inputs.heroku_api_key
         heroku_app_name: github.event.inputs.heroku_app_name
-        heroku_email: '${{ github.event.inputs.actor }}@users.noreply.github.com'
+        heroku_email: github.event.inputs.actor@users.noreply.github.com
 
     - name: Create Release Tag
       env:
+        PULL_REQUEST_BASE_SHA: github.event.inputs.pull_request_base_sha
+        PULL_REQUEST_CURRENT_SHA: github.event.inputs.current_sha
         GH_TOKEN: github.event.inputs.github_token
         LATEST_TAG: ${{ steps.set-variables.outputs.LATEST_TAG }}
         RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
       run: |
-        COMMITS=$(git log --pretty=format:'- %s' ${{ github.event.inputs.pull_request_base_sha}}..${{ github.event.inputs.current_sha }} --no-merges --reverse)
+        COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_CURRENT_SHA --no-merges --reverse)
         BODY=$(printf "%s\n\nFull Changelog: %s" "$COMMITS" "[$LATEST_TAG...$RELEASE_TAG](https://github.com/LeCollectionist/${{ env.GITHUB_REPOSITORY }}/compare/$LATEST_TAG...$RELEASE_TAG)")
         gh release create $RELEASE_TAG --target ${{ github.event.inputs.production_branch }} --notes "$BODY" --title $RELEASE_TAG
 
     - name: Send message to Slack
       env:
-        SLACK_API_TOKEN: github.event.inputs.slack_api_token
-        SLACK_CHANNEL_ID: github.event.inputs.slack_channel_id
-        RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
+        PULL_REQUEST_BASE_SHA: github.event.inputs.pull_request_base_sha
+        PULL_REQUEST_CURRENT_SHA: github.event.inputs.current_sha
         DISPLAY_NAME: github.event.inputs.display_name
+        RELEASE_TAG: ${{ steps.set-variables.outputs.RELEASE_TAG }}
+        SLACK_CHANNEL_ID: github.event.inputs.slack_channel_id
+        SLACK_API_TOKEN: github.event.inputs.slack_api_token
       run: |
-        COMMITS=$(git log --pretty=format:'- %s' ${{ github.event.inputs.pull_request_base_sha}}..${{ github.event.inputs.current_sha }} --no-merges --reverse)
+        COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_CURRENT_SHA --no-merges --reverse)
         PAYLOAD='{"text":"<!here> Deploy `$DISPLAY_NAME` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
         curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_API_TOKEN" --data "$PAYLOAD" "https://slack.com/api/chat.postMessage"
 
@@ -135,9 +140,11 @@ jobs:
 
     - name: Rebase Production Branch into Dev
       if: github.event.pull_request.head.ref != 'dev'
+      env:
+        ACTOR: github.event.inputs.actor
       run: |
-        git config user.name "${{ github.actor }}"
-        git config user.email "${{ github.actor }}@users.noreply.github.com"
+        git config user.name "$ACTOR"
+        git config user.email "$ACTOR@users.noreply.github.com"
 
         git rebase origin/${{ github.event.inputs.production_branch }}
 
@@ -149,11 +156,12 @@ jobs:
       if: github.event.pull_request.head.ref == 'dev'
       env:
         NEXT_RELEASE_TAG: ${{ steps.set-variables.outputs.NEXT_RELEASE_TAG }}
+        ACTOR: github.event.inputs.actor
       run: |
         sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
 
-        git config user.name "${{ github.actor }}"
-        git config user.email "${{ github.actor }}@users.noreply.github.com"
+        git config user.name "$ACTOR"
+        git config user.email "$ACTOR@users.noreply.github.com"
 
         git add ./config/initializers/bugsnag.rb
         git commit -m "chore(app-version): Bump app version to $NEXT_RELEASE_TAG"
