@@ -136,43 +136,32 @@ runs:
       fetch-depth: 0
       token: ${{ inputs.pat }}
 
-  - name: Rebase Production Branch into Dev
-    if: ${{ inputs.pull_request_head_ref }} != 'dev'
+  - name: Rebase Production Branch into Dev OR Update Version Configuration and Create Daily Pull Request
     shell: bash
     env:
       ACTOR: ${{ inputs.actor }}
-      PRODUCTION_BRANCH: ${{ inputs.production_branch }}
-    run: |
-      git config user.name "$ACTOR"
-      git config user.email "$ACTOR@users.noreply.github.com"
-
-      git rebase origin/$PRODUCTION_BRANCH
-
-      if [ $? -eq 0 ] && [ -z "$(git diff origin/dev)" ]; then
-        git push -f origin dev
-      fi
-
-  - name: Update Version Configuration on Dev
-    if: ${{ inputs.pull_request_head_ref }} == 'dev'
-    shell: bash
-    env:
       NEXT_RELEASE_TAG: ${{ env.next-release-tag }}
-      ACTOR: ${{ inputs.actor }}
+      PRODUCTION_BRANCH: ${{ inputs.production_branch }}
+      GH_TOKEN: ${{ inputs.github_token }}
     run: |
-      sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
-
       git config user.name "$ACTOR"
       git config user.email "$ACTOR@users.noreply.github.com"
 
-      git add ./config/initializers/bugsnag.rb
-      git commit -m "chore(app-version): Bump app version to $NEXT_RELEASE_TAG"
-      git push origin dev
+      if [ "${{ inputs.pull_request_head_ref }}" != 'dev' ]; then
+        # Rebase Production Branch into Dev
+        git rebase origin/$PRODUCTION_BRANCH
 
-  - name: Create Daily Pull Request
-    if: ${{ inputs.pull_request_head_ref }} == 'dev'
-    shell: bash
-    env:
-      GH_TOKEN: ${{ inputs.github_token }}
-      PRODUCTION_BRANCH: ${{ inputs.production_branch }}
-    run: |
-      gh pr create --base $PRODUCTION_BRANCH --head dev --title "$PRODUCTION_BRANCH < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
+        if [ $? -eq 0 ] && [ -z "$(git diff origin/dev)" ]; then
+          git push -f origin dev
+        fi
+      else
+        # Update Version Configuration on Dev
+        sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
+
+        git add ./config/initializers/bugsnag.rb
+        git commit -m "chore(app-version): Bump app version to $NEXT_RELEASE_TAG"
+        git push origin dev
+
+        # Create Daily Pull Request
+        gh pr create --base $PRODUCTION_BRANCH --head dev --title "$PRODUCTION_BRANCH < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
+      fi
