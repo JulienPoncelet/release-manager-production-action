@@ -66,10 +66,10 @@ runs:
   - name: Checkout Production Branch
     uses: actions/checkout@v4
     with:
-      repository: ${{ github.event.inputs.github_organizations }}/${{ github.event.inputs.github_repository }}
-      ref: ${{ github.event.inputs.production_branch }}
+      repository: ${{ inputs.github_organizations }}/${{ inputs.github_repository }}
+      ref: ${{ inputs.production_branch }}
       fetch-depth: 0
-      token: ${{ github.event.inputs.pat }}
+      token: ${{ inputs.pat }}
 
   - name: Set Variables
     id: set-variables
