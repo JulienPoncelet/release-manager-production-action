@@ -164,5 +164,6 @@ runs:
 
           # Create Next Release Pull Request
           CAPITALIZED_PRODUCTION_BRANCH=$(echo "$PRODUCTION_BRANCH" | awk '{print toupper(substr($0, 1, 1)) tolower(substr($0, 2))}')
-          gh pr create --base $PRODUCTION_BRANCH --head dev --title "$CAPITALIZED_PRODUCTION_BRANCH < Dev ($NEXT_RELEASE_TAG)" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
+          BODY="## Description and Changes Made\n---"
+          gh pr create --base $PRODUCTION_BRANCH --head dev --title "$CAPITALIZED_PRODUCTION_BRANCH < Dev ($NEXT_RELEASE_TAG)" --body "$(echo -e "$BODY")"
         fi
