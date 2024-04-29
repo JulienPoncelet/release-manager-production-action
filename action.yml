@@ -64,9 +64,9 @@ runs:
         GH_TOKEN: ${{ inputs.github_token }}
         PULL_REQUEST_HEAD_REF: ${{ inputs.pull_request_head_ref }}
       run: |
-        daily_deploy=false
+        is_hotfix=true
         if [[ $PULL_REQUEST_HEAD_REF == "dev" ]]; then
-          daily_deploy=true
+          is_hotfix=false
         fi
 
         LATEST_TAG=$(gh release view --json tagName -q .tagName)
@@ -75,11 +75,11 @@ runs:
         minor=$(echo $LATEST_TAG | cut -d. -f2)
         patch=$(echo $LATEST_TAG | cut -d. -f3)
 
-        if $daily_deploy; then
+        if $is_hotfix; then
+          ((patch=patch+1))
+        else
           ((minor=minor+1))
           patch=0
-        else
-          ((patch=patch+1))
         fi
 
         RELEASE_TAG="$major.$minor.$patch"
@@ -136,7 +136,7 @@ runs:
         fetch-depth: 0
         token: ${{ inputs.pat }}
 
-    - name: Rebase Production Branch into Dev OR Update Version Configuration and Create Daily Pull Request
+    - name: Rebase Production Branch into Dev OR Update Version Configuration and Create Next Release Pull Request
       shell: bash
       env:
         ACTOR: ${{ inputs.actor }}
@@ -162,6 +162,7 @@ runs:
           git commit -m "chore(app-version): Bump app version to $NEXT_RELEASE_TAG"
           git push origin dev
 
-          # Create Daily Pull Request
-          gh pr create --base $PRODUCTION_BRANCH --head dev --title "$PRODUCTION_BRANCH < Dev" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
+          # Create Next Release Pull Request
+          CAPITALIZED_PRODUCTION_BRANCH=$(echo "$PRODUCTION_BRANCH" | awk '{print toupper(substr($0, 1, 1)) tolower(substr($0, 2))}')
+          gh pr create --base $PRODUCTION_BRANCH --head dev --title "$CAPITALIZED_PRODUCTION_BRANCH < Dev ($NEXT_RELEASE_TAG)" --body "$(cat .github/PULL_REQUEST_TEMPLATE/TEMPLATE_FOR_PRODUCTION.md)"
         fi
