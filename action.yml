@@ -156,9 +156,16 @@ runs:
           fi
         else
           # Update Version Configuration on Dev
-          sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
+          if [ -f "./config/initializers/bugsnag.rb" ]; then
+            sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
+            git add ./config/initializers/bugsnag.rb
+          fi
 
-          git add ./config/initializers/bugsnag.rb
+          if [ -f "./package.json" ]; then
+            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$NEXT_RELEASE_TAG\"/" ./package.json
+            git add ./package.json
+          fi
+
           git commit -m "chore(app-version): Bump app version to $NEXT_RELEASE_TAG"
           git push origin dev
 
