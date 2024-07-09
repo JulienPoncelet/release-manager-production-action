@@ -30,6 +30,9 @@ inputs:
   pull_request_head_sha:
     description: 'SHA of the head commit of the pull request'
     required: true
+  pull_request_number:
+    description: 'Number of the pull request'
+    required: true
   actor:
     description: 'GitHub actor initiating the action'
     required: true
@@ -128,6 +131,14 @@ runs:
         COMMITS=$(echo "$COMMITS" | sed 's/"/\\"/g')
         PAYLOAD='{"text":"<!here> Deploy `'$DISPLAY_NAME'` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
         curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_API_TOKEN" --data "$PAYLOAD" "https://slack.com/api/chat.postMessage"
+
+    - name: Move Shortcut Tickets
+      shell: bash
+      env:
+        GITHUB_REPOSITORY: ${{ inputs.github_repo_full_name }}
+        PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
+      run: |
+        curl -X GET "https://p3000-z49a27885-z8afe9130-gtw.z527f1c91.blockdev.sh/process_story_commits" -d "full_name=$GITHUB_REPOSITORY" -d "pull_request_number=$PULL_REQUEST_NUMBER"
 
     - name: Checkout Dev
       uses: actions/checkout@v4
