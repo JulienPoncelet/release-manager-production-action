@@ -93,6 +93,7 @@ runs:
         echo "next-release-tag=$(echo $NEXT_RELEASE_TAG)" >> $GITHUB_ENV
 
     - name: Deploy to Heroku
+      if: ${{ inputs.heroku_app_name != '' || inputs.heroku_api_key != '' }}
       uses: akhileshns/heroku-deploy@v3.13.15
       with:
         heroku_api_key: ${{ inputs.heroku_api_key }}
