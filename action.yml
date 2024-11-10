@@ -12,38 +12,29 @@ inputs:
   heroku_api_key:
     description: 'API key for accessing Heroku'
     required: true
-  slack_api_token:
-    description: 'API token for accessing Slack'
-    required: true
-  slack_channel_id:
-    description: 'ID of the Slack channel'
-    required: true
   pat:
     description: 'Personal access token for GitHub'
-    required: true
-  pull_request_base_sha:
-    description: 'SHA of the base commit of the pull request'
     required: true
   pull_request_head_ref:
     description: 'Ref of the head commit of the pull request'
     required: true
-  pull_request_head_sha:
-    description: 'SHA of the head commit of the pull request'
-    required: true
   actor:
     description: 'GitHub actor initiating the action'
     required: true
-  display_name:
-    description: 'Display name for Slack messages'
-    required: true
   github_repo_full_name:
     description: 'Full name of the GitHub repository'
+    required: true
+  github_repo_name:
+    description: 'Name of the GitHub repository'
     required: true
   heroku_app_name:
     description: 'Name of the Heroku app'
     required: true
   production_branch:
     description: 'Name of the production branch'
+    required: true
+  lc_manager_base_url:
+    description: 'Base URL of the Rails app for release management'
     required: true
 
 runs:
@@ -64,9 +55,9 @@ runs:
         GH_TOKEN: ${{ inputs.github_token }}
         PULL_REQUEST_HEAD_REF: ${{ inputs.pull_request_head_ref }}
       run: |
-        is_hotfix=true
+        IS_HOTFIX=true
         if [[ $PULL_REQUEST_HEAD_REF == "dev" ]]; then
-          is_hotfix=false
+          IS_HOTFIX=false
         fi
 
         LATEST_TAG=$(gh release view --json tagName -q .tagName)
@@ -91,44 +82,26 @@ runs:
         echo "latest-tag=$(echo $LATEST_TAG)" >> $GITHUB_ENV
         echo "release-tag=$(echo $RELEASE_TAG)" >> $GITHUB_ENV
         echo "next-release-tag=$(echo $NEXT_RELEASE_TAG)" >> $GITHUB_ENV
+        echo "is_hotfix=$(echo $IS_HOTFIX)" >> $GITHUB_ENV
 
     - name: Deploy to Heroku
-      if: ${{ inputs.heroku_app_name != '' || inputs.heroku_api_key != '' }}
+      if: ${{ inputs.heroku_app_name != '' && inputs.heroku_api_key != '' }}
       uses: akhileshns/heroku-deploy@v3.13.15
       with:
         heroku_api_key: ${{ inputs.heroku_api_key }}
         heroku_app_name: ${{ inputs.heroku_app_name }}
         heroku_email: ${{ inputs.actor }}@users.noreply.github.com
 
-    - name: Create Release Tag
+    - name: Call LC Manager to Create the Release
       shell: bash
       env:
-        PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
-        PULL_REQUEST_HEAD_SHA: ${{ inputs.pull_request_head_sha }}
-        LATEST_TAG: ${{ env.latest-tag }}
-        RELEASE_TAG: ${{ env.release-tag }}
-        GH_TOKEN: ${{ inputs.github_token }}
-        GITHUB_REPOSITORY: ${{ inputs.github_repo_full_name }}
-        PRODUCTION_BRANCH: ${{ inputs.production_branch }}
+        LC_MANAGER_BASE_URL: ${{ inputs.lc_manager_base_url }}
+        GITHUB_REPOSITORY_NAME: ${{ inputs.github_repo_name }}
+        IS_HOTFIX: ${{ env.is_hotfix }}
       run: |
-        COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_HEAD_SHA --no-merges --reverse)
-        BODY=$(printf "%s\n\nFull Changelog: %s" "$COMMITS" "[$LATEST_TAG...$RELEASE_TAG](https://github.com/$GITHUB_REPOSITORY/compare/$LATEST_TAG...$RELEASE_TAG)")
-        gh release create $RELEASE_TAG --target $PRODUCTION_BRANCH --notes "$BODY" --title $RELEASE_TAG
-
-    - name: Send message to Slack
-      shell: bash
-      env:
-        PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
-        PULL_REQUEST_HEAD_SHA: ${{ inputs.pull_request_head_sha }}
-        DISPLAY_NAME: ${{ inputs.display_name }}
-        RELEASE_TAG: ${{ env.release-tag }}
-        SLACK_CHANNEL_ID: ${{ inputs.slack_channel_id }}
-        SLACK_API_TOKEN: ${{ inputs.slack_api_token }}
-      run: |
-        COMMITS=$(git log --pretty=format:'- %s' $PULL_REQUEST_BASE_SHA..$PULL_REQUEST_HEAD_SHA --no-merges --reverse)
-        COMMITS=$(echo "$COMMITS" | sed 's/"/\\"/g')
-        PAYLOAD='{"text":"<!here> Deploy `'$DISPLAY_NAME'` - Version '$RELEASE_TAG'\n```'"$COMMITS"'```", "channel":"'"$SLACK_CHANNEL_ID"'"}'
-        curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_API_TOKEN" --data "$PAYLOAD" "https://slack.com/api/chat.postMessage"
+        curl -X POST "$LC_MANAGER_BASE_URL/releases" \
+          -d "repository_name=$GITHUB_REPOSITORY_NAME" \
+          -d "hotfix=$IS_HOTFIX"
 
     - name: Checkout Dev
       uses: actions/checkout@v4
