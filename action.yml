@@ -6,9 +6,6 @@ branding:
   color: 'gray-dark'
 
 inputs:
-  github_token:
-    description: 'GitHub token for accessing the repository'
-    required: true
   heroku_api_key:
     description: 'API key for accessing Heroku'
     required: true
@@ -52,7 +49,6 @@ runs:
       id: set-variables
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.github_token }}
         PULL_REQUEST_HEAD_REF: ${{ inputs.pull_request_head_ref }}
       run: |
         IS_HOTFIX=true
@@ -60,28 +56,6 @@ runs:
           IS_HOTFIX=false
         fi
 
-        LATEST_TAG=$(gh release view --json tagName -q .tagName)
-
-        major=$(echo $LATEST_TAG | cut -d. -f1)
-        minor=$(echo $LATEST_TAG | cut -d. -f2)
-        patch=$(echo $LATEST_TAG | cut -d. -f3)
-
-        if $IS_HOTFIX; then
-          ((patch=patch+1))
-        else
-          ((minor=minor+1))
-          patch=0
-        fi
-
-        RELEASE_TAG="$major.$minor.$patch"
-
-        ((minor=minor+1))
-
-        NEXT_RELEASE_TAG="$major.$minor.0"
-
-        echo "latest-tag=$(echo $LATEST_TAG)" >> $GITHUB_ENV
-        echo "release-tag=$(echo $RELEASE_TAG)" >> $GITHUB_ENV
-        echo "next-release-tag=$(echo $NEXT_RELEASE_TAG)" >> $GITHUB_ENV
         echo "is_hotfix=$(echo $IS_HOTFIX)" >> $GITHUB_ENV
 
     - name: Deploy to Heroku
@@ -102,50 +76,3 @@ runs:
         curl -X POST "$LC_MANAGER_BASE_URL/releases" \
           -d "repository_name=$GITHUB_REPOSITORY_NAME" \
           -d "hotfix=$IS_HOTFIX"
-
-    - name: Checkout Dev
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ inputs.github_repo_full_name }}
-        ref: dev
-        fetch-depth: 0
-        token: ${{ inputs.pat }}
-
-    - name: Rebase Production Branch into Dev OR Update Version Configuration and Create Next Release Pull Request
-      shell: bash
-      env:
-        ACTOR: ${{ inputs.actor }}
-        NEXT_RELEASE_TAG: ${{ env.next-release-tag }}
-        PRODUCTION_BRANCH: ${{ inputs.production_branch }}
-        GH_TOKEN: ${{ inputs.github_token }}
-      run: |
-        git config user.name "$ACTOR"
-        git config user.email "$ACTOR@users.noreply.github.com"
-
-        if [ "${{ inputs.pull_request_head_ref }}" != 'dev' ]; then
-          # Rebase Production Branch into Dev
-          git rebase origin/$PRODUCTION_BRANCH
-
-          if [ $? -eq 0 ] && [ -z "$(git diff origin/dev)" ]; then
-            git push -f origin dev
-          fi
-        else
-          # Update Version Configuration on Dev
-          if [ -f "./config/initializers/bugsnag.rb" ]; then
-            sed -i "s/config.app_version = \"[^\"]*\"/config.app_version = \"$NEXT_RELEASE_TAG\"/" ./config/initializers/bugsnag.rb
-            git add ./config/initializers/bugsnag.rb
-          fi
-
-          if [ -f "./package.json" ]; then
-            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$NEXT_RELEASE_TAG\"/" ./package.json
-            git add ./package.json
-          fi
-
-          git commit -m "chore(app-version): Bump app version to $NEXT_RELEASE_TAG"
-          git push origin dev
-
-          # Create Next Release Pull Request
-          CAPITALIZED_PRODUCTION_BRANCH=$(echo "$PRODUCTION_BRANCH" | awk '{print toupper(substr($0, 1, 1)) tolower(substr($0, 2))}')
-          BODY="## Description and Changes Made\n---"
-          gh pr create --base $PRODUCTION_BRANCH --head dev --title "$CAPITALIZED_PRODUCTION_BRANCH < Dev ($NEXT_RELEASE_TAG)" --body "$(echo -e "$BODY")"
-        fi
