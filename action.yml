@@ -58,6 +58,11 @@ runs:
 
         echo "is_hotfix=$(echo $IS_HOTFIX)" >> $GITHUB_ENV
 
+    - name: Install Heroku CLI
+      shell: bash
+      run: |
+        curl https://cli-assets.heroku.com/install.sh | sh
+
     - name: Deploy to Heroku
       if: ${{ inputs.heroku_app_name != '' && inputs.heroku_api_key != '' }}
       uses: akhileshns/heroku-deploy@v3.13.15
